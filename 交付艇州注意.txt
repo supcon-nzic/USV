@@ -1,0 +1,43 @@
+仿真
+开机启动以下几个：
+1 roscore   写成了start_roscore.sh 放在了rc.local中
+2 自动source仿真程序的工作空间  写在了~/.bashrc中
+3 npc自启   写在了rc.local中
+4 在rc.local中添加source /root/USV_V1/To_computer_simulation/devel/setup.bash
+5 hcu_to_computer_server节点，写成了server.sh  放在rc.local中 并把rc.local的头问件改成了bash
+
+
+实际：
+开机启动以下几个：
+1 传感器launch  使用ros自带的开机自启upstart  启动后的name为test 停止用 rosrun robot_updtart unistall test
+2 roscore 写成了start_roscore.sh 放在了rc.local中
+3 自动source仿真程序的工作空间  写在了~/.bashrc中
+4 npc自启   写在了rc.local中
+5 在rc.local中添加source /root/USV_V1/applications/sailing_robot_control/devel/setup.bash
+6 hcu_to_computer_server（实际的）节点，写成了server.sh  放在rc.local中 并把rc.local的头问件改成了bash
+7 加入灯闪程序
+8 将视频传输程序（client_t.py）写入rc.local(nobup /usr/bin/python /root/USV_V1/video_push/client_t.py &)
+9 添加默认路由（route addd default gw 192.168.8.1）至开机启动
+10 手自切换放入开机自动（rc.local,未做）
+
+调试常出现
+1 4G /WIFI无法进入
+网口线接触不良，网口灯不闪烁
+
+2 wifi 可进 4G不可进
+npc  默认网关，是否能ping通自己，是否能ping通百度
+
+3视频传输异常卡顿
+4G卡流量用尽
+
+4 GPS无数据
+ 
+上位机未配置WT902输出经纬度（GPS未定位成功，定位成功蓝色指示灯闪烁）
+串口异常不通
+
+5 姿态传感器磁场不正确
+ 磁场未校准
+
+
+
+

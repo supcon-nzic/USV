@@ -1,0 +1,2 @@
+adc_func 是adc节点的依赖函数
+pwm_func 是pwm节点的依赖函数

@@ -1,0 +1,69 @@
+#!/usr/bin/python
+# Simulator for the DI and  AI
+
+
+
+import rospy
+from std_msgs.msg import Float32, Bool,Int32
+import time
+
+
+class DI_AI_simu():
+	def __init__(self):
+		rospy.init_node("simulation_DI_AI", anonymous = True)
+
+		self.DI_1_pub = rospy.Publisher('DI_1', Bool, queue_size = 10)
+		self.DI_2_pub = rospy.Publisher('DI_2', Bool, queue_size = 10)
+		self.DI_3_pub = rospy.Publisher('DI_3', Bool, queue_size = 10)
+		self.DI_4_pub = rospy.Publisher('DI_4', Bool, queue_size = 10)
+		self.AI_1_pub = rospy.Publisher('AI_1', Float32, queue_size = 10)
+		self.AI_2_pub = rospy.Publisher('AI_2', Float32, queue_size = 10)
+		self.ph_pub = rospy.Publisher('ph', Float32, queue_size = 10)
+		self.temperature_pub = rospy.Publisher('temperature', Float32, queue_size = 10)
+		self.tds_pub = rospy.Publisher('tds', Int32,queue_size = 10)
+		
+		self.DI_1 = False
+		self.DI_2 = False
+		self.DI_3 = False
+		self.DI_4 = False
+		self.AI_1 = 0.0
+		self.AI_2 = 0.0
+		self.ph = 0.0
+		self.temperature = 0.0
+		self.tds = 0
+		self.rate = rospy.Rate(10)
+
+		self.DI_AI_publisher()
+
+	
+	def DI_AI_publisher(self):
+		while not rospy.is_shutdown():
+			self.DI_1 = True
+			self.DI_2 = True
+			self.DI_3 = False
+			self.DI_4 = False
+			self.AI_1 = 10.789654
+			self.AI_2 = 20.789654
+			self.ph = 7.7
+			self.temperature = 28.8
+			self.tds = 300
+
+			print(self.DI_4)
+			self.DI_1_pub.publish(self.DI_1)
+			self.DI_2_pub.publish(self.DI_2)
+			self.DI_3_pub.publish(self.DI_3)
+			self.DI_4_pub.publish(self.DI_4)
+			self.AI_1_pub.publish(self.AI_1)
+			self.AI_2_pub.publish(self.AI_2)
+			self.ph_pub.publish(self.ph)
+			self.temperature_pub.publish(self.temperature)
+			self.tds_pub.publish(self.tds)
+
+			self.rate.sleep()
+			
+
+if __name__ == '__main__':
+    try:
+        DI_AI_simu()
+    except rospy.ROSInterruptException:
+        pass

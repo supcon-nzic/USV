@@ -1,0 +1,3 @@
+<launch>
+    <node name="hcu_to_computer_server" pkg="sailing_robot" type="hcu_to_computer_server"/> 
+/launch>

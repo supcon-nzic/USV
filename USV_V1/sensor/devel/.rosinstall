@@ -1,0 +1,2 @@
+- setup-file:
+    local-name: /root/USV_V1/sensor/devel/setup.sh

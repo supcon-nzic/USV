@@ -1,0 +1,10 @@
+#!/usr/bin/python
+# -*- coding: UTF-8 -*
+
+import os,sys, string
+import commands
+import re
+
+p = commands.getoutput("pgrep roslaunch")
+commands.getoutput("kill %s" % p)
+print('1111111')

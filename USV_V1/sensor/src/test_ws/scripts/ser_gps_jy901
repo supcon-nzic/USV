@@ -1,0 +1,294 @@
+#!/usr/bin/env python
+# -*-coding: utf-8 -*-
+# license removed for brevity
+import rospy
+import serial.tools.list_ports
+import serial
+import struct
+#import queue
+#import  threading 
+import numpy as np
+import time
+
+import csv
+import math
+
+from LatLon import LatLon
+from pyproj import Proj
+
+from std_msgs.msg import Float64,Float32
+from sensor_msgs.msg import NavSatFix
+
+
+def trans(s):
+    return "b'%s'" % ''.join('\\x%.2x' % x for x in s)
+
+com_name = '/dev/ttyS4'
+def open_com(com_name):
+    serialFd = serial.Serial(com_name, 9600, timeout=60)
+    return serialFd     
+	
+"obtain longtitude and latitude quaterninon and ACC data from GPS+JY901"
+class Connect():
+    def __init__(self):
+        self.serialFd = open_com(com_name)
+        self.bys_dly = b'\x00'
+        self.q4 = [0.0, 0.0, 0.0, 0.0]
+        self.acc = [0.0, 0.0,0.0]
+        self.gps = [0.0, 0.0]
+        self.angle = [0,0,0]
+        self.magnetic = [0,0,0]
+        self.angle_imu = [0,0,0]
+        self.finish = False
+    def get_data(self):
+        bys =self.serialFd.read()
+        if (self.bys_dly == b'\x55') and (bys == b'\x59'):
+            self.q4_get()
+        if(self.bys_dly == b'\x55') and (bys == b'\x57'):
+            self.gps_get()
+        if(self.bys_dly == b'\x55') and (bys == b'\x54'):
+            self.magnetic_get()
+        if(self.bys_dly == b'\x55') and (bys == b'\x53'):
+            self.angle_get()
+        if(self.bys_dly == b'\x55') and (bys == b'\x51'):
+            self.acc_get()
+        self.bys_dly = bys
+
+
+    def q4_get(self):
+        bys =b''
+        for i in range(0,8):
+            bys+=self.serialFd.read()
+        data = struct.unpack('<4h',bys)
+        data = np.array(data)
+        data = data/32768.0
+        self.q4 = data
+        
+
+
+    def acc_get(self):
+        bys =b''
+        for i in range(0,8):
+            bys+=self.serialFd.read()
+        data = struct.unpack('<4h',bys)
+        data = np.array(data[:3])
+        data =data/32768.0*16
+        self.acc = data
+
+    def gps_get(self):
+        bys =b''
+        for i in range(0,8):
+            bys+=self.serialFd.read()
+        data = struct.unpack('<2I',bys)
+        data = np.array(data)
+        data =data/10000000.0
+        self.gps = data
+
+    def angle_get(self):
+        bys = b''
+        for i in range(0,8):
+            bys+=self.serialFd.read()
+        data = struct.unpack('<4H',bys)
+        data_imu = struct.unpack('<4h',bys)
+        #print('data',data)
+        data = np.array(data[:3])
+        data_imu = np.array(data_imu[:3])
+        data = 360 - data*180/32768
+        data_imu = data_imu*180/32768
+        self.angle = data
+        self.angle_imu = data_imu
+        print('self.angle',self.angle)
+        self.finish = True
+
+    def magnetic_get(self):
+        bys = b''
+        for i in range(0,8):
+            bys+=self.serialFd.read()
+        data = struct.unpack('<4h',bys)
+        data = np.array(data[:3])
+        self.magnetic = data
+        print('self.magnetic',self.magnetic)
+
+
+#to x  y
+def acc_trans(q,g):
+    q = np.array(q)
+    g = np.array(g).T
+    c = np.array([
+                        [1-2*(q[2]*q[2]+q[3]*q[3]),2*(q[1]*q[2]+q[0]*q[3])  ,2*(q[1]*q[3]-q[0]*q[2])],
+                        [2*(q[1]*q[2]-q[0]*q[3])  ,1-2*(q[1]*q[1]+q[3]*q[3]),2*(q[2]*q[3]+q[0]*q[1])],
+                        [2*(q[1]*q[3]+q[0]*q[2])  ,2*(q[2]*q[3]-q[0]*q[1])  ,1-2*(q[1]*q[1]+q[2]*q[2])]
+                    ])
+    c_I= np.linalg.inv(c)
+    #g_neu=c_I @ g
+    g_neu=np.dot(c_I,g)
+    return g_neu
+
+
+#60decimal to decimal
+def degre(a):
+    a = float(a)
+    a=a*100
+    t1=int(a/100)
+    t2=(a%100)/60
+    return (t1 + t2)
+
+#latitude and longtitude to x and y
+def gps_trans(lat,lon):
+        lat = degre(lat)
+        lon = degre(lon)
+        #print('lat',lat)
+        #print('lon',lon)
+        d_x,d_y = NV.latlon_to_utm(lon,lat)
+        return d_x,d_y
+
+
+
+
+class Kl_fit:
+
+    def __init__(self):
+        t = 0.05
+        self.X = np.array([[0],
+                            [0],
+                            [0]])
+        self.F = np.array([[1,t,0.5*t*t],
+                           [0,1,t],
+                           [0,0,1]])
+        self.P = np.array([[1,0,0],
+                           [0,10,0],
+                           [0,0,100] 
+                            ])
+
+        self.Q = np.array([[0.1,0,0],
+                           [0,1,0],
+                           [0,0,1]        
+                                    ])
+
+        self.H = np.array([[1,0,0],
+                           [0,0,1]
+                ])
+
+
+        self.R = np.array([[10000,0],
+                           [0,1000]
+        ])
+ 
+        self.I = np.array([[1,0,0],
+                           [0,1,0],
+                           [0,0,1]
+                            ])
+    def run_kl(self,pm,am):
+        #x_ = self.F@self.X
+        x_ = np.dot(self.F,self.X)
+        #P_ = self.F@self.P@self.F.T + self.Q  
+        P_ = np.dot(np.dot(self.F,self.P),self.F.T)+self.Q
+
+        z = np.array([[pm],
+                      [am]])
+        
+        #y = z - self.H@x_
+        y = z - np.dot(self.H,x_)
+
+        #S = self.H@P_@self.H.T + self.R
+        S = np.dot(np.dot(self.H,P_),self.H.T) + self.R
+        #K = P_@self.H.T@np.linalg.inv(S)
+        K = np.dot(np.dot(P_,self.H.T),np.linalg.inv(S))
+
+        #self.X = x_ + K@y
+        self.X = x_ + np.dot(K,y)
+        #self.P = (self.I - K@self.H)@P_
+        self.P = np.dot((self.I - np.dot(K,self.H)),P_)
+#latcoordinate transformation 
+class Navigation(object):
+    """docstring for ClassName"""
+    def __init__(self, utm_zone=51,ellps='WGS84'):
+        self.projection = Proj(proj='utm', zone=utm_zone, ellps='WGS84')
+      
+    def latlon_to_utm(self, lat, lon):
+        """Returns (x, y) coordinates in metres"""
+        return self.projection(lon, lat)
+
+    def utm_to_latlon(self, x, y):
+        """Returns a LatLon object"""
+        lon, lat = self.projection(x, y, inverse=True)
+        return lat, lon
+
+
+if __name__ == '__main__':
+    con = Connect()
+    kl_x = Kl_fit()
+    kl_y = Kl_fit()
+    NV = Navigation()
+
+    #f = open('/root/{}_gps_imu.csv'.format(time.time()),'w')
+
+    rospy.init_node('ser_gps_imu',anonymous = True)
+    position_pub = rospy.Publisher('position', NavSatFix, queue_size = 10)
+    imu_pub = rospy.Publisher('heading', Float32, queue_size = 10)
+
+    #publish  attitude sensor data
+    imu_Roll_pub = rospy.Publisher('Roll', Float32, queue_size = 10)
+    imu_Pitch_pub = rospy.Publisher('Pitch', Float32, queue_size = 10)
+    imu_Yaw_pub = rospy.Publisher('Yaw', Float32, queue_size = 10)
+    imu_ax_pub = rospy.Publisher('acceleration_x', Float32, queue_size = 10)
+    imu_ay_pub = rospy.Publisher('acceleration_y', Float32, queue_size = 10)
+    imu_az_pub = rospy.Publisher('acceleration_z', Float32, queue_size = 10)
+    imu_mx_pub = rospy.Publisher('magnetic_x', Float32, queue_size = 10)
+    imu_my_pub = rospy.Publisher('magnetic_y', Float32, queue_size = 10)
+    imu_mz_pub = rospy.Publisher('magnetic_z', Float32, queue_size = 10)
+
+    rate = rospy.Rate(10)
+    msg_position = NavSatFix()
+    heading = Float32()
+    while not rospy.is_shutdown():
+        while True:
+            con.get_data()
+            if con.finish == True:
+                con.finish = False
+                break
+        Roll = con.angle_imu[0]
+        Pitch = con.angle_imu[1]
+        Yaw = con.angle_imu[2]
+        acceleration_x = con.acc[0]
+        acceleration_y = con.acc[1]
+        acceleration_z = con.acc[2]
+
+        magnetic_x = con.magnetic[0]
+        magnetic_y = con.magnetic[1]
+        magnetic_z = con.magnetic[2]
+
+        heading = con.angle[2]
+        print('heading',heading)
+        g_neu=acc_trans(con.q4,con.acc)
+        #print('con.gps[0]',con.gps[0])
+        #print('con.gps[1]',con.gps[1])
+        x_y = gps_trans(con.gps[0],con.gps[1])
+        kl_x.run_kl(x_y[0],g_neu[0])
+        kl_y.run_kl(x_y[1],g_neu[1])
+        #print('x=',kl_x.X[0])
+        #print('y=',kl_y.X[0])
+    
+        #latitude ,longitude = NV.utm_to_latlon(kl_x.X[0],kl_y.X[0])
+        latitude ,longitude = NV.utm_to_latlon(x_y[0],x_y[1])
+
+        #f.write('{:.3f},{},{}\n'.format(time.time(),longitude,latitude))        
+        
+        print('longitude',longitude)
+        print('latitude',latitude)
+        msg_position.longitude = longitude
+        msg_position.latitude = latitude
+        position_pub.publish(msg_position)
+        imu_pub.publish(heading)
+
+        imu_Roll_pub.publish(Roll)
+        imu_Pitch_pub.publish(Pitch)
+        imu_Yaw_pub.publish(Yaw)
+        imu_ax_pub.publish(acceleration_x)
+        imu_ay_pub.publish(acceleration_y)
+        imu_az_pub.publish(acceleration_z)
+        imu_mx_pub.publish(magnetic_x)
+        imu_my_pub.publish(magnetic_y)
+        imu_mz_pub.publish(magnetic_z)
+
+        rate.sleep()

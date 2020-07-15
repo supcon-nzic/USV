@@ -1,0 +1,144 @@
+#!/usr/bin/python
+# -*- coding: UTF-8 -*-
+# Simulator for the boat position based on velocity and heading
+
+
+import rospy
+from sailing_robot.navigation import Navigation
+from std_msgs.msg import Float64, Float32, String
+from sensor_msgs.msg import NavSatFix
+import socket
+import json
+
+
+class Client_tcp():
+    def __init__(self):
+        rospy.init_node("client_tcp", anonymous = True)
+
+        # params
+        utm_zone = rospy.get_param('navigation/utm_zone')
+        self.nav = Navigation(utm_zone = utm_zone)
+
+        # Get waypoints
+        if rospy.has_param('wp/list'):
+            wp_list = rospy.get_param('wp/list')
+        elif rospy.has_param('wp/tasks'):
+            tasks_list = rospy.get_param('wp/tasks')
+            wp_list = [t['waypoint'] for t in tasks_list if 'waypoint' in t]
+        else:
+            rospy.logwarn("No waypoint was found!")
+
+        wp_table = rospy.get_param('wp/table')
+        wp_list = list(set(wp_list))  # print each point only once
+        self.wp_array = [self.nav.latlon_to_utm(*wp_table[wp]) for wp in wp_list]  # [lat, lon]
+
+        # topics
+        rospy.Subscriber('heading', Float32, self.update_heading)
+        self.heading = 0
+        rospy.Subscriber('goal_heading', Float32, self.update_goal_heading)
+        self.goal_heading = 0
+        rospy.Subscriber('wind_direction_apparent', Float64, self.update_wind_direction)
+        self.wind_direction_apparent = 0
+        rospy.Subscriber('position', NavSatFix, self.update_position)
+        self.latitude = 0
+        self.longitude = 0
+        rospy.Subscriber('sailing_state', String, self.update_sailing_state)
+        self.sailing_state = 'normal'
+
+        rospy.Subscriber('dbg_keep_station_waypoint', String, self.update_dbg_keep_station_waypoint)
+        self.dbg_keep_station_waypoint = ''
+
+        rospy.Subscriber('dbg_real_waypoint', String, self.update_dbg_real_waypoint)
+        self.dbg_real_waypoint = ''
+
+        rospy.Subscriber('dbg_ball_position', String, self.update_dbg_ball_position)
+        self.dbg_ball_position = ''
+
+        self.freq = rospy.get_param("config/rate")
+        self.rate = rospy.Rate(self.freq)
+
+        self.client_tcp_send()
+
+    def update_heading(self, msg):
+        self.heading = msg.data
+
+    def update_goal_heading(self, msg):
+        self.goal_heading = msg.data
+
+    def update_wind_direction(self, msg):
+        self.wind_direction_apparent = msg.data
+
+    def update_position(self, msg):
+        self.latitude = msg.latitude
+        self.longitude = msg.longitude
+        self.position = list(self.nav.latlon_to_utm(msg.latitude, msg.longitude))
+
+    def update_sailing_state(self, msg):
+        self.sailing_state = msg.data
+
+    def update_dbg_keep_station_waypoint(self, msg):
+        self.dbg_keep_station_waypoint = msg.data
+        self.dbg_keep_station_waypoint = json.loads(self.dbg_keep_station_waypoint)
+        self.dbg_keep_station_waypoint = [self.nav.latlon_to_utm(*waypoint) for waypoint in
+                                          self.dbg_keep_station_waypoint]
+
+    def update_dbg_real_waypoint(self, msg):
+        self.dbg_real_waypoint = [self.nav.latlon_to_utm(*json.loads(msg.data))]
+
+    def update_dbg_ball_position(self, msg):
+        self.dbg_real_waypoint = [self.nav.latlon_to_utm(*json.loads(msg.data))]
+
+    def client_tcp_send(self):
+        #   创建套接字
+        mySocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        #   设置ip和端口
+        # host = socket.gethostname()
+        host = "47.107.161.103"
+        # host = "149.28.151.235"
+        # host = "198.13.46.65"
+        # port = 50001
+        port = 23336
+        #   连接到服务器
+        mySocket.connect((host, port))
+        mySocket.send('Publisher sailing_param ' + str(1.0 / self.freq))
+        rospy.loginfo('connected to ' + host)
+
+        while not rospy.is_shutdown():
+
+            msg = dict()
+            # rospy.loginfo(vars(self))
+            for var, value in vars(self).items():
+                if var == 'rate':
+                    msg[var] = self.freq
+                elif var == 'position_history':
+                    msg[var] = list(value)
+                elif var == 'nav':
+                    pass
+                else:
+                    msg[var] = value
+
+            # msg_wangxuexi = str("0605") + " " + str(self.latitude) + ' ' + str(self.longitude) + " " + str(
+            #     self.heading) + " " + str(self.goal_heading) + " " + str(
+            #     self.wind_direction_apparent) + " " + self.sailing_state + " " + str("1011")
+            # try:
+            #     mySocket.send(str(msg_wangxuexi))
+            # except KeyboardInterrupt:
+            #     mySocket.send("over")
+            #     mySocket.shutdown(2)
+            #     mySocket.close()
+            #     print("over")
+            #     break
+
+            # rospy.loginfo(msg)
+            mySocket.send(json.dumps(msg))
+
+            self.rate.sleep()
+
+        mySocket.close()
+
+
+if __name__ == '__main__':
+    try:
+        Client_tcp()
+    except rospy.ROSInterruptException:
+        pass

@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+# -*-coding: utf-8 -*-
+#license removed for brevity
+
+import rospy
+from std_msgs.msg import Float32, String
+import math
+
+
+
+def adc_read(channel):
+	cnt = str(channel+7)
+	channel = str(channel)
+	adc = '/sys/bus/iio/devices/iio:device1/in_voltage_vaux_raw'
+	adc_dir = adc[:43]+cnt+adc[43:48]+channel + adc[48:]
+	file_adc = open(adc_dir)
+	adc_value = file_adc.read()
+	adc_value = int(adc_value)
+	return adc_value
+
+def temperature_PH():
+    rospy.init_node('temperature_PH', anonymous = True) 
+    pub_temperature = rospy.Publisher('temperature', Float32, queue_size=10)
+    pub_ph = rospy.Publisher('ph', Float32, queue_size=10)
+    rate = rospy.Rate(10)
+    
+    temperature = Float32()
+    ph = Float32()
+
+    while not rospy.is_shutdown():
+        data1 = adc_read(1)  # read AI(1)
+        if data1 > 20:
+            temperature.data = (abs(data1-715)/1445.0)*100.00 - 20.00
+            print("temperature.data",temperature.data)
+        else:
+            print('no sensor connnect')
+
+        if data1 > 20:
+            data2 = adc_read(2)  #read AI(2)  
+            ph.data = (abs(data2 - 715) / 1445.0)*14.00
+            print("ph.data",ph.data)
+        else:
+            print('no sensor connnect')
+
+
+        pub_temperature.publish(temperature)
+        pub_ph.publish(ph)
+        rate.sleep()
+
+
+
+if __name__ == '__main__':
+    try:
+        temperature_PH()
+    except expression as identifier:
+        pass

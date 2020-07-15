@@ -1,0 +1,66 @@
+#!/usr/bin/env python
+"""
+Node looks up correct sail setting from table
+Subscribes: wind direction apparent
+Sets sail actuator to correct PWM value
+"""
+import time
+import rospy
+from std_msgs.msg import Float64, Float32, String, Int16, Bool
+# import pigpio
+from sailing_robot.sail_table import SailTable
+
+# SAILGPIO = rospy.get_param('sail/pin')
+
+direct = False
+task_direct_sailsheet_normalized = 0
+
+# get dictionary for the boat specific sail PWM settings
+minPWM = rospy.get_param('sail/servolowerlimits')
+maxPWM = rospy.get_param('sail/servohigherlimits')
+
+
+def update_direct(msg):
+    global direct
+    direct = msg.data
+
+
+def update_task_direct_sailsheet_normalized(msg):
+    global task_direct_sailsheet_normalized
+    task_direct_sailsheet_normalized = msg.data
+
+
+def sail_servo_update(msg):
+    if direct:
+        sheet_normalized = task_direct_sailsheet_normalized
+    else:
+        sheet_normalized = msg.data
+
+    # calculate actual PWM value from limits
+    sheetPWM = (sheet_normalized * (maxPWM - minPWM)) + minPWM
+    debug_pub_pwm.publish(sheetPWM)  # piPWM.set_servo_pulsewidth(SAILGPIO, sheetPWM)
+
+
+def post():
+    '''Power-On Self Test'''
+    if not rospy.get_param('do_post', False):
+        pass
+
+    # rospy.logwarn('sail test: sheet in')  # piPWM.set_servo_pulsewidth(SAILGPIO, minPWM)  # time.sleep(3)  # rospy.logwarn('sail test: sheet out')  # piPWM.set_servo_pulsewidth(SAILGPIO, maxPWM)  # time.sleep(3)
+
+
+if __name__ == '__main__':
+    # piPWM = pigpio.pi()
+    # piPWM.set_mode(SAILGPIO, pigpio.OUTPUT) # GPIO 24/RPi PIN 18 as sail servo pin
+    post()
+    try:
+        debug_pub_pwm = rospy.Publisher('pwm_sail', Float32, queue_size = 10)
+        rospy.init_node('actuator_driver_sail', anonymous = True)
+        rospy.Subscriber('sailsheet_normalized', Float32, sail_servo_update)
+        rospy.Subscriber('task_direct_sailsheet_normalized', Int16, update_task_direct_sailsheet_normalized)
+        rospy.Subscriber('direct', Bool, update_direct)
+
+        rospy.spin()
+
+    except rospy.ROSInterruptException:
+        pass

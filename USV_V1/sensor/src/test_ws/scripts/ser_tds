@@ -1,0 +1,35 @@
+#!/usr/bin/env python
+# -*-coding: utf-8 -*-
+#license removed for brevity
+
+import serial
+import time
+import rospy
+from std_msgs.msg import Int32
+
+data_ser = serial.Serial("/dev/ttyPS1", 9600, timeout=15)
+data_ser.flushInput()  
+print("Com up!")
+data_bytes = bytearray()
+
+def tds():
+    rospy.init_node('ser_tds', anonymous = True)
+    pub = rospy.Publisher('tds', Int32, queue_size = 10)
+    rate = rospy.Rate(1)
+    TDS = Int32()
+    while not rospy.is_shutdown():
+        #time.sleep(1)
+        data_ser.write(b'\xFD\xFD\xFD')
+        data_bytes = bytearray(data_ser.read(5)) 
+        TDS.data = data_bytes[2]
+        TDS.data = ((TDS.data << 8) | data_bytes[1])
+        print("TDS_Value-->", TDS, "PPM")
+        pub.publish(TDS)
+        rate.sleep()
+
+
+if __name__ == "__main__":
+    try:
+        tds()
+    except rospy.ROSInterruptException:
+        pass

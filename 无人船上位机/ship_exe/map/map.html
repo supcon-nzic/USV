@@ -1,0 +1,345 @@
+﻿<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no, width=device-width">
+    <title>带功能控件的地图</title>
+    <link rel="stylesheet" href="https://a.amap.com/jsapi_demos/static/demo-center/css/demo-center.css" />
+    <script type="text/javascript" src='https://a.amap.com/jsapi_demos/static/citys.js'></script>
+    <script src="https://cache.amap.com/lbs/static/es5.min.js"></script>
+    <script src="./js/coordtransform.js"></script>
+    <script src="https://webapi.amap.com/maps?v=1.4.15&key=bf9852379bc673c89e519408151c18b1&&plugin=AMap.Scale,AMap.OverView,AMap.ToolBar"></script>
+    <script src="./js/qwebchannel.js"></script>
+
+    <style>
+        html, body {
+            height: 100%;
+        }
+        #container {
+            height: 100%;
+        }
+        .custom-input-card{
+            width: 18rem;
+        }
+        .custom-input-card .btn:last-child{
+            margin-left: 1rem;
+        }
+        .content-window-card{
+            position: relative;
+            width: 23rem;
+            padding: 0.75rem 0 0 1.25rem;
+            box-shadow: none;
+            bottom: 0;
+            left: 0;
+        }
+        .content-window-card p{
+            height: 2rem;
+        }
+        .infoo p{
+            font-size: 20px;
+            font-weight: bold;
+            padding: 4px;
+        }
+    </style>
+</head>
+<body>
+<div id="container"></div>
+
+<script>
+    //  变量
+    //  是否开放右键菜单
+    var bOpenMenu = true;
+    //  菜单显示的位置
+    var contextMenuPositon;
+
+    //  图层
+    var normalLayer = new AMap.TileLayer();
+    var satelLite = new AMap.TileLayer.Satellite();
+    var roadNet = new AMap.TileLayer.RoadNet();
+
+    map = new AMap.Map("container", {
+        resizeEnable: true,
+        zoom: 18,
+        center: [120.137971, 30.17943],
+        layers: [
+            satelLite,
+            //roadNet
+        ]
+    });
+
+    //  地图控件
+    var scale = new AMap.Scale({
+        visible: true
+    });
+    toolBar = new AMap.ToolBar({
+        visible: true
+    });
+    overView = new AMap.OverView({
+        visible: false
+    });
+    map.addControl(scale);
+    map.addControl(toolBar);
+    map.addControl(overView);
+
+    //  标记样式
+    var style = [{
+        url: 'https://a.amap.com/jsapi_demos/static/images/mass1.png',
+        anchor: new AMap.Pixel(5, 5),
+        size: new AMap.Size(10, 10),
+    }];
+
+    //  海量点标记
+    var mass = new AMap.MassMarks([], {
+        opacity: 0.8,
+        zIndex: 111,
+        cursor: 'pointer',
+        style: style,
+    });
+
+    var offset1 = new AMap.Pixel(-50,-76)
+    //  标注点注释内容
+    var marker = new AMap.Marker({content: ' ', map: map, anchor: 'bottom-left', offset: offset1});
+
+    //  海量点鼠标事件
+    mass.on('mouseover', function (e) {
+        marker.setLabel({content: e.data.name});
+        marker.setPosition(e.data.lnglat);
+        marker.show();
+    });
+
+    mass.setMap(map);
+
+    //  声明任务线对象
+    var taskLine = new AMap.Polyline({
+        path: [],
+        isOutline: true,
+        outlineColor: '#ffeeff',
+        borderWeight: 0,
+        strokeColor: "#3366FF",
+        strokeOpacity: 1,
+        strokeWeight: 6,
+        // 折线样式还支持 'dashed'
+        strokeStyle: "solid",
+        lineJoin: 'round',
+        lineCap: 'round',
+        zIndex: 50,
+      	showDir: true,
+    });
+
+    //  声明轨迹线对象
+    var trailLine = new AMap.Polyline({
+        path: [],
+        isOutline: true,
+        borderWeight: 0,
+        strokeOpacity: 1,
+        strokeWeight: 6,
+        strokeColor: 'red',
+        strokeStyle: "solid",
+        lineJoin: 'round',
+        showDir: true,
+    });
+
+    //  最新轨迹线的点标注
+    var trailMarker = new AMap.Marker({
+        visible: false,
+        autoRotation: true,
+        angle: -90,
+        icon: './images/direction.png',
+        offset: new AMap.Pixel(-16, -12),
+    });
+
+    var style2 = [{
+        url: 'https://a.amap.com/jsapi_demos/static/images/mass0.png',
+        anchor: new AMap.Pixel(5, 5),
+        size: new AMap.Size(10, 10),
+    }];
+
+    //  轨迹线海量点标记
+    var mass2 = new AMap.MassMarks([], {
+        opacity: 0.8,
+        zIndex: 111,
+        cursor: 'pointer',
+        style: style2,
+    });
+
+    //  海量点鼠标事件
+    mass2.on('mouseover', function (e) {
+        marker.setLabel({content: e.data.name});
+        marker.setPosition(e.data.lnglat);
+        marker.show();
+    });
+
+    mass2.setMap(map);
+
+    //  线数组
+    var lineList = [taskLine, trailLine, marker, trailMarker];
+
+    //  添加轨迹线对象
+    map.add(lineList);
+
+    //  菜单内容
+    //  菜单对象
+    var contextMenu = new AMap.ContextMenu();
+
+    //  标记菜单
+    contextMenu.addItem("添加任务点", function(){
+        window.foo.addTaskPoint(contextMenuPositon.getLng(), contextMenuPositon.getLat());
+    });
+    contextMenu.addItem("清空任务点", function(){
+        window.foo.clearTaskPoint();
+    });
+
+    //  建立通道
+    new QWebChannel(qt.webChannelTransport, function(channel){
+        window.foo = channel.objects.foo; // 注册
+    });
+
+    //  设置地图中心坐标
+    function setCenterLngLat(lng, lat)
+    {
+        lnglat = new AMap.LngLat(lng, lat);
+        map.setCenter(lnglat);
+        map.setZoom(9);
+    };
+
+    //  获取中心坐标
+    function getCenterLngLat()
+    {
+        lnglat = map.getCenter();
+        return lnglat.toString();
+    };
+
+    //  更改图层
+    function setLayer(type, needRoad)
+    {
+        var layers = [];
+        if (type == 0)
+        {
+            layers.push(normalLayer);
+        }
+        else
+        {
+            layers.push(satelLite);
+            if (needRoad)
+            {
+                layers.push(roadNet);
+            }
+        }
+        map.setLayers(layers);
+        mass.setMap(map);
+    };
+
+    //  添加任务的点
+    function appendTaskPoint(lng, lat, desc){
+        var path = taskLine.getPath();
+        lnglat = new AMap.LngLat(lng, lat);
+        path.push(lnglat);
+        map.remove(lineList);
+        map.add(lineList);
+
+        var data = mass.getData();
+        data.push({
+            lnglat: [lng, lat],
+            name: '<div class="infoo"><p style="text-align:center;">任务</p><p>经度:' + String(lng) + '</p><p>纬度:' +String(lat) + '</p><p>功能:' + desc + '</p></div>',
+            id: 1,
+        });
+        mass.setData(data);
+    };
+
+    //  修改任务点
+    function modifyTaskPoint(current, lng, lat, desc){
+        var path = taskLine.getPath();
+        lnglat = new AMap.LngLat(lng, lat);
+        path[current] = lnglat;
+        map.remove(lineList);
+        map.add(lineList);
+
+        var data = mass.getData();
+        var value = data[current];
+        value.name = '<div class="infoo"><p style="text-align:center;">任务</p><p>经度:' + String(lng) + '</p><p>纬度:' +String(lat) + '</p><p>功能:' + desc + '</p></div>',
+        value.lnglat = [lng, lat];
+        mass.setData(data);
+    };
+
+    //  删除某个任务点
+    function deleteTaskPoint(current){
+        var path = taskLine.getPath();
+        path.splice(current, 1);
+        map.remove(lineList);
+        map.add(lineList);
+
+        var data = mass.getData();
+        data.splice(current, 1);
+        mass.setData(data);
+    };
+
+    //  清空任务点
+    function clearTaskPoint(){
+        var path = [];
+        taskLine.setPath(path);
+        map.remove(lineList);
+        map.add(lineList);
+        mass.setData(path);
+    };
+
+    //  添加轨迹点
+    function appendTrailLine(lng, lat, angle){
+        var path = trailLine.getPath();
+        lnglat = new AMap.LngLat(lng, lat);
+        trailMarker.setPosition(lnglat);
+        trailMarker.setAngle(angle + 90);
+        trailMarker.show();
+        path.push(lnglat);
+        map.remove(lineList);
+        map.add(lineList);
+    };
+
+    //  清空轨迹点
+    function clearTrailLine(){
+        var path = [];
+        trailLine.setPath(path);
+        map.remove(trailLine);
+        map.add(trailLine);
+    };
+
+    //  添加轨迹线的海量点
+    function addTrailMass(lng, lat, desc){
+        var data = mass2.getData();
+        data.push({
+            lnglat: [lng, lat],
+            name: '<div class="infoo"><p style="text-align:center;">轨迹</p><p>经度:' + String(lng) + '</p><p>纬度:' +String(lat) + '</p><p>' + desc + '</p></div>',
+            id: 1,
+        });
+        mass2.setData(data);
+    };
+
+    //  鼠标单击事件
+    map.on('click', function(e) {
+        var lng = e.lnglat.getLng();
+        var lat = e.lnglat.getLat();
+        window.foo.getCoordinates(lng, lat);
+
+        marker.hide();
+    });
+
+    //  鼠标移动事件
+    map.on('mousemove', function(e) {
+        var lng = e.lnglat.getLng();
+        var lat = e.lnglat.getLat();
+        window.foo.getCoordinates(lng, lat);
+    });
+
+    //  鼠标右键菜单
+    map.on('rightclick', function(e) {
+        if (bOpenMenu)
+        {
+            contextMenu.open(map, e.lnglat);
+            contextMenuPositon = e.lnglat;
+        }
+        marker.hide();
+    });
+
+</script>
+</body>
+</html>

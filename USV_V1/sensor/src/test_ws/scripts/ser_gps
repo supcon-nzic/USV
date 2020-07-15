@@ -1,0 +1,128 @@
+#!/usr/bin/env python
+# -*-coding: utf-8 -*-
+# license removed for brevity
+
+import rospy
+from std_msgs.msg import String, Float64
+from sensor_msgs.msg import NavSatFix
+import serial
+import threading
+import binascii
+from datetime import datetime
+import struct
+import csv
+
+class SerialPort:
+
+    def __init__(self, port, buand):
+        self.port = serial.Serial(port, buand)
+        self.port.close()
+        if not self.port.isOpen():
+            self.port.open()
+
+    def port_open(self):
+        if not self.port.isOpen():
+            self.port.open()
+
+    def port_close(self):
+        self.port.close()
+
+    def send_data(self):
+        self.port.write('')
+
+    def read_data(self):
+        global is_exit
+        global data_bytes
+        while not is_exit:
+            count = self.port.inWaiting()
+            if count > 0:
+                rec_str = self.port.read(count)
+                data_bytes=data_bytes+rec_str
+                # print(count)
+                #print('当前数据接收总字节数：'+str(len(data_bytes))+' 本次接收字节数：'+str(len(rec_str)))
+                #print(str(datetime.now()),':',binascii.b2a_hex(rec_str))
+
+serialPort = '/dev/ttyACM0' 
+baudRate = 9600  # 波特率
+is_exit=False
+data_bytes=bytearray()
+
+class Gps_Ser():
+
+    def __init__(self):
+        global data_bytes
+        self.position_pub = rospy.Publisher('position', NavSatFix, queue_size=10)
+        self.velocity_pub = rospy.Publisher('velocity', Float64, queue_size=10)
+        rate = rospy.Rate(10) # 10hz
+        mSerial = SerialPort(serialPort, baudRate)
+
+        # 开始数据读取线程
+        # t1 = threading.Thread(target=mSerial.read_data)
+        # t1.setDaemon(True)
+        # t1.start()
+        lat=10
+        lon=0
+        vx=0
+        vy=0
+        vz=0
+        # v=0
+        msg_position = NavSatFix()
+        msg_velocity = Float64()
+        while not ( rospy.is_shutdown()):
+        #主线程:对读取的串口数据进行处理
+            count=mSerial.port.inWaiting()
+            while count < 61:
+                count=mSerial.port.inWaiting()
+            rec_str = mSerial.port.read(count)
+            data_bytes=data_bytes+rec_str
+            data_len=len(data_bytes)
+            i=0
+	    while(i<data_len-30):
+                if(data_bytes[i]==0xFE and data_bytes[i+3]==0x01 and data_bytes[i+4]==0x01 and data_bytes[i+5]==0x21):
+                    #print(data_bytes[i+10:i+14])
+                    lat = struct.unpack('<i',data_bytes[i+10:i+14])[0]
+                    lon = struct.unpack('<i',data_bytes[i+14:i+18])[0]
+                    vx = struct.unpack('<h',data_bytes[i+24:i+26])[0]
+                    vy = struct.unpack('<h',data_bytes[i+26:i+28])[0]
+                    vz = struct.unpack('<h',data_bytes[i+28:i+30])[0] 
+                    #print(data_bytes[i+10]) 
+                    #print(data_bytes[i+11]) 
+                    #print(data_bytes[i+12]) 
+                    #print(data_bytes[i+13])
+                    print(lat,lon) 
+                    i = i+30
+                    #print("1111")
+                    break
+                elif(data_bytes[i]==0xFD and data_bytes[i+5]==0x01 and data_bytes[i+6]==0x01 and data_bytes[i+7]==0x21):
+                    lat = struct.unpack('<i',data_bytes[i+14:i+18])[0]
+                    lon = struct.unpack('<i',data_bytes[i+18:i+22])[0]
+                    vx = struct.unpack('<h', data_bytes[i + 28:i + 30])[0]
+                    vy = struct.unpack('<h', data_bytes[i + 30:i + 32])[0]
+                    vz = struct.unpack('<h', data_bytes[i + 32:i + 34])[0]
+                    i=i+34
+                    print("2222")
+                    break
+                else:
+                    i=i+1
+            data_bytes[0:i]=b''
+
+            msg_position.latitude = lat*1.0/10000000
+            msg_position.longitude = lon*1.0/10000000
+            #print(lat)
+            #print(lon)
+            # velocity =(vx**2+vy**2+vz**2)**0.5 
+            # print(velocity)
+            print("----------")
+            msg_velocity.data = (vx**2+vy**2+vz**2)**0.5
+            #msg_position=msg_position/10000000
+            self.position_pub.publish(msg_position)
+            self.velocity_pub.publish(msg_velocity)
+            rate.sleep()
+
+
+if __name__ == '__main__':
+    try:
+        rospy.init_node('ser_gps', anonymous=True)
+        Gps_Ser()
+    except rospy.ROSInterruptException:
+        pass    

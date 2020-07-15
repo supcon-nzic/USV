@@ -1,0 +1,52 @@
+#!/usr/bin/env python
+
+#rospy.init_node('en_Mapping', anonymous=True)
+#uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
+#roslaunch.configure_logging(uuid)
+#launch = roslaunch.parent.ROSLaunchParent(uuid, ["/home/haier/catkin_ws/src/testapi/launch/test_node.launch"])
+#launch = roslaunch.parent.ROSLaunchParent(uuid, ["/home/yuqizhi/To_computer_simulation/src/sailing_robot/launch/simulator.launch"])
+#launch.start()
+
+#rospy.loginfo("started")
+
+#while not rospy.is_shutdown():
+
+#	rospy.sleep(30)
+#	launch.shutdown()
+
+# 3 seconds later
+#launch.shutdown()
+
+
+
+
+
+import roslaunch
+import rospy
+import multiprocessing
+
+
+rospy.init_node('en_Mapping', anonymous=True)
+uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
+roslaunch.configure_logging(uuid)
+launch = roslaunch.parent.ROSLaunchParent(uuid, ["/root/USV_V1/To_computer_simulation/src/sailing_robot/launch/simulator.launch"])
+launch.start()
+rospy.sleep(30)
+launch.shutdown()
+
+# def l_shut(args):
+# 	launch.shutdown()
+# rospy.sleep(30)
+# t1 = multiprocessing.Process(target=l_shut,args=(launch))
+# t1.start
+	
+
+# while not rospy.is_shutdown():
+# 	rospy.sleep(30)
+
+	
+	#launch.shutdown()
+# 3 seconds later
+#launch.shutdown()
+
+

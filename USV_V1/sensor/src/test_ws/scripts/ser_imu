@@ -1,0 +1,96 @@
+#!/usr/bin/python
+# -*-coding: utf-8 -*-
+
+import serial
+import threading
+import binascii
+from datetime import datetime
+import struct
+import csv
+import rospy
+from std_msgs.msg import String, Float32, Float64
+
+class SerialPort:
+    def __init__(self, port, buand):
+        self.port = serial.Serial(port, buand)
+        self.port.close()
+        if not self.port.isOpen():
+            self.port.open()
+
+    def port_open(self):
+        if not self.port.isOpen():
+            self.port.open()
+
+    def port_close(self):
+        self.port.close()
+
+    def send_data(self):
+        self.port.write('')
+
+    def read_data(self):
+        global is_exit
+        global data_bytes
+        while not is_exit:
+            count = self.port.inWaiting()
+            if count > 0:
+                rec_str = self.port.read(count)
+                data_bytes=data_bytes+rec_str
+                # print(count)
+                #print('当前数据接收总字节数：'+str(len(data_bytes))+' 本次接收字节数：'+str(len(rec_str)))
+                #print(str(datetime.now()),':',binascii.b2a_hex(rec_str))
+
+
+serialPort = '/dev/ttyS1'  # 串口
+baudRate = 9600  # 波特率
+is_exit=False
+data_bytes=bytearray()
+
+if __name__ == '__main__':
+    try:
+        #打开串口
+        rospy.init_node("ser_imu", anonymous=True)
+        heading_pub = rospy.Publisher('heading', Float32, queue_size=10)
+        mSerial = SerialPort(serialPort, baudRate)
+        #wind_pub = rospy.Publisher('wind_direction_apparent', Float64, queue_size = 10)
+        #absolute_wind_direction = 317
+        #开始数据读取线程
+        # t1 = threading.Thread(target=mSerial.read_data)
+        # t1.setDaemon(True)
+        # t1.start()
+        
+        heading = Float32()
+        rate = rospy.Rate(10) # 10hz
+        while not rospy.is_shutdown():
+            #主线程:对读取的串口数据进行处理
+            count=mSerial.port.inWaiting()
+	    #print('11')
+            while count < 21:
+                 count=mSerial.port.inWaiting()
+            rec_str = mSerial.port.read(count)
+            data_bytes=data_bytes+rec_str
+	    #print('22')
+            data_len=len(data_bytes)
+            i=0
+            #print(data_len)
+            #print data_bytes
+            while(i<data_len-10):
+                if(data_bytes[i]==0x55 and data_bytes[i+1]==0x53):
+                    YawL = data_bytes[i+6]
+                    YawH = data_bytes[i+7]
+                    #heading.data = ((YawH<<8)|YawL)*180/32768
+                    heading.data = 360 - (((YawH<<8)|YawL)*180/32768+1)
+                    # z = struct.unpack('<f',data_bytes[i+18:i+22])[0]
+                    print("imu:")
+                    print(heading.data)
+                    heading_pub.publish(heading)
+                    #wind_direction_apparent = absolute_wind_direction - heading.data
+                    #print('wind_direction_apparent'+str(wind_direction_apparent))
+                    #wind_pub.publish(wind_direction_apparent)
+                    i = i+10
+                else:
+                    i = i+1
+            data_bytes[0:i]=b''
+            rate.sleep()
+
+    except rospy.ROSInterruptException:
+        pass

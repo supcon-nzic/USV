@@ -1,0 +1,2 @@
+- setup-file:
+    local-name: /root/USV_V1/applications/sailing_robot_control/devel/setup.sh

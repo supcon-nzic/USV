@@ -1,0 +1,10 @@
+<launch>
+	  <!--node name = "ser_adc" pkg="test_ws" type="ser_adc" output = "screen"/-->
+ 	  <!--node name = "ser_pwm" pkg="test_ws" type="ser_pwm" output = "screen"/-->
+          <!--node name = "ser_imu" pkg="test_ws" type="ser_imu" output = "screen"/-->
+ 	  <node name = "ser_gps_jy901" pkg="test_ws" type="ser_gps_jy901" output = "screen"/>
+	  <!--node name = "ser_tds" pkg="test_ws" type="ser_tds" output = "screen"/-->
+	  <!--node name = "ser_temperature_PH" pkg="test_ws" type="ser_temperature_PH" output = "screen"/-->
+	  <!--node name = "uart0_to_uart5" pkg="test_ws" type="uart0_to_uart5" output = "screen"/-->
+          <!--node name = "ALINX_server" pkg="test_ws" type="ALINX_server.py" output = "screen"/-->
+</launch>

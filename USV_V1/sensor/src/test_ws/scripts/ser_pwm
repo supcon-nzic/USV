@@ -1,0 +1,71 @@
+#!/usr/bin/env python
+# license removed for brevity
+import sensor_dep.pwm_func as pwmf
+import rospy
+from std_msgs.msg import String, Float64, Float32, Int16
+
+###change 1 to 5 rudder control
+
+class Pwm_Ser():
+
+    def __init__(self):
+        # pi
+        #pwmf.pwm_export(0)# judge  
+        #pwmf.pwm_export(1)# rudder
+        #pwmf.pwm_export(2)# sail
+        #pwmf.pwm_export(4) #pt
+        #pwmf.pwm_export(5)
+        # po
+        self.judge_mid = 1500000
+        self.rudder = 1500000
+        self.sail = 1500000
+
+        #PO number starts from 0 in program,  line number starts from 1
+        pwmf.pwm_period_config(1,20000000)  #PO2
+        pwmf.pwm_period_config(0,20000000)  #PO1
+        pwmf.pwm_duty_cycle_config(0,self.rudder)
+        pwmf.pwm_duty_cycle_config(1,self.sail)
+        pwmf.pwm_enable(0)
+        pwmf.pwm_enable(1)
+        rospy.Subscriber('pwm_rudder',Float32, self.update_pwm_rudder)
+        rospy.Subscriber('pwm_sail', Float32, self.update_pwm_sail)
+     #   rospy.Subscriber('pwm_rudder', Float64, self.update_pwm_rudder)
+     #   rospy.Subscriber('pwm_sail', Float64, self.update_pwm_sail)
+        self.judge_and_control() 
+
+
+    def update_pwm_rudder(self, msg):
+        self.rudder = int(msg.data*1000)
+
+    def update_pwm_sail(self, msg):
+        self.sail = int(msg.data*1000)
+
+    def judge_and_control(self):
+        rate = rospy.Rate(10) # 10hz
+        judge_flag = False
+        while not rospy.is_shutdown():
+            cap_period, cap_pwm = pwmf.pwm_capture(3) # PI4
+            if(cap_pwm>9000000):
+                continue
+            if(cap_period<15000000):
+            #judge_flag = (cap_pwm>self.judge_mid)
+	           continue        
+            judge_flag = (cap_pwm>self.judge_mid)
+            if judge_flag:
+		self.rudder=int(self.rudder/10000)*10000
+		self.sail=int(self.sail/10000)*10000
+		#self.rudder=1100000
+                pwmf.pwm_duty_cycle_config(1,self.rudder)
+                pwmf.pwm_duty_cycle_config(0,self.sail)
+                print(self.rudder)
+                rospy.logwarn('pwm_rudder'+str(self.rudder))
+                print("true")
+
+            rate.sleep()
+
+if __name__ == '__main__':
+    try:
+        rospy.init_node("ser_pwm", anonymous=True)
+        Pwm_Ser()
+    except rospy.ROSInterruptException:
+        pass

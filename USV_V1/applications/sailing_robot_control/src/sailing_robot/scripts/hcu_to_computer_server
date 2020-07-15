@@ -1,0 +1,201 @@
+#!/usr/bin/python
+# -*- coding: UTF-8 -*-
+# Simulator for the boat position based on velocity and heading
+
+import json
+import zlib
+from sailing_robot.my_dir import up_dir, down_dir
+import rospy
+from std_msgs.msg import Float32, Float64, String, Bool, Int16, Int32
+from sensor_msgs.msg import NavSatFix
+import socket
+import threading
+import sys
+import signal
+import time
+import roslaunch
+import multiprocessing
+import os
+import commands
+import re
+#import zidingyi
+
+
+class HCU_to_computer():
+    def __init__(self):
+        rospy.init_node('hcu_to_computer', anonymous=True)
+
+        # json
+        self.up_dir = up_dir
+        self.down_dir = down_dir
+        #self.rate = rospy.Rate(1)
+
+        #self.heading = ''
+        #self.goal_heading = ''
+        #self.sailing_dtate = ''
+
+        # launch
+
+        # init socket
+        self.host = "192.168.8.100"
+        self.port = 702
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.sock.bind((self.host, self.port))
+
+        # publsiher
+        #self.task_configuration_pub = rospy.Publisher('task_configuration', zidingyi, queue_size=10)
+        #self.do_pub = rospy.Publisher('task_configuration', zidingyi, queue_size=10)
+
+        # topic of sensor
+        rospy.Subscriber('heading', Float32, self.updata_sensor)
+        rospy.Subscriber('goal_heading', Float32, self.updata_sensor)
+        rospy.Subscriber('sailing_state', String, self.updata_sensor)
+        rospy.Subscriber('position', NavSatFix, self.updata_sensor)
+        rospy.Subscriber('wind_direction_apparent', Float64, self.updata_sensor)
+        rospy.Subscriber('task_ix', Int16, self.updata_sensor)
+ 
+        # topic of temperature,ph,tds
+        rospy.Subscriber('temperature', Float32, self.updata_sensor)
+        rospy.Subscriber('ph', Float32, self.updata_sensor)
+        rospy.Subscriber('tds', Int32, self.updata_sensor)
+
+        # topic of DI
+        rospy.Subscriber('DI_1', Bool, self.updata_DI)
+        rospy.Subscriber('DI_2', Bool, self.updata_DI)
+        rospy.Subscriber('DI_3', Bool, self.updata_DI)
+        rospy.Subscriber('DI_4', Bool, self.updata_DI)
+
+    def updata_sensor(self, msg):
+        topic = msg._connection_header["topic"][1:]
+        if topic == 'position':
+            self.up_dir["status"][topic]["longitude"] = msg.longitude
+            self.up_dir["status"][topic]["latitude"] = msg.latitude
+        else:
+            self.up_dir["status"][topic] = msg.data
+
+    def updata_DI(self, msg):
+        topic = msg._connection_header["topic"][1:]
+        self.up_dir["DI"][topic] = msg.data
+        
+
+    # def updata_AI(self, msg):
+    #     topic = msg._connection_header["topic"][1:]
+    #     self.up_dir["AI"][topic] = msg.data
+
+    # def updata_log(self,msg):
+    #   pass
+
+    def launch_start(slef):   
+        os.system("/root/USV_V1/applications/sailing_robot_control/launch.sh")        
+
+    def send_function(self, client):
+        rate = rospy.Rate(1)
+        while not rospy.is_shutdown():
+            up_data = json.dumps(self.up_dir)
+            up_data.encode('utf-8')
+            #up_data = zlib.compress(up_data)
+            client.send(up_data)
+            rate.sleep()
+
+    def recv_function(self, client):
+        while not rospy.is_shutdown():
+            try:
+                down_data = client.recv(4096)
+                rospy.logwarn('down_data'+str(down_data))
+                if down_data != '' or down_data != None:
+                    #down_data = zlib.decompress(down_data)
+                    down_data = down_data.decode('utf-8')
+                    json_data = json.loads(down_data)
+                    # print(json.data)
+
+                    if json_data["stop"] == True:
+                        p = commands.getoutput("pgrep roslaunch")
+                        commands.getoutput("kill %s" % p)
+                    else:
+                        threading.Thread(target=self.launch_start,args=()).start()
+
+                        #get /wp/target_radius in Rosmaster
+                        rospy.sleep(35)
+                        radius = rospy.get_param('/wp/target_radius')
+                        rospy.logwarn("get param radius [%d]", radius)
+
+                        target_radius = json_data["target_radius"]
+                        rospy.set_param("/wp/target_radius", target_radius)
+
+                        radius = rospy.get_param('/wp/target_radius')
+                        rospy.logwarn("get param radius [%d]", radius)
+
+                        # from computer recv longitude and latitude then set position param in Rosmater
+                        #task_id = [0 for i in range(len(json_data ["task_configuration"]))]
+                        task_id = []
+                        # print('task_id',task_id)
+                        for i in range(len(json_data["task_configuration"])):
+                            value = [json_data["task_configuration"][i]["latitude"],
+                                        json_data["task_configuration"][i]["longitude"]]
+                            rospy.set_param('/wp/table/{}'.format(i+1), value)
+
+                            # deal "siamping" and "photograph" and creat task
+                            #print('len',len(json_data ["task_configuration"]))
+                            print(json_data["task_configuration"]
+                                    [i]["function"]["action"])
+                            if json_data["task_configuration"][i]["function"]["action"] == "samping":
+                                task = {"kind": "keep_station",
+                                        "waypoint": "{}".format(i+1), "linger": 60}
+                                task_id.insert(i, task)
+                                print('i--------', i)
+                            elif json_data["task_configuration"][i]["function"]["action"] == "photograph":
+                                task = {"kind": "keep_station",
+                                        "waypoint": "{}".format(i+1), "linger": 60}
+                                task_id.insert(i, task)
+                            elif json_data["task_configuration"][i]["function"]["action"] == "anchor":
+                                task = {"kind": "keep_station",
+                                        "waypoint": "{}".format(i+1), "linger": 60}
+                                task_id.insert(i, task)
+                            else:
+                                task = {"kind": "to_waypoint",
+                                        "waypoint": "{}".format(i+1)}
+                                task_id.insert(i, task)
+                                print('i--------pass', i)
+
+                        print(task_id)
+                        rospy.set_param('/wp/tasks', task_id)
+                else:
+                    pass
+            except:
+                pass
+        # except Exception,e:
+        #    rospy.logwarn('sock error :%s' % e)
+        #    self.recv_function(client)
+
+    def term_sig_handler(self, signum, frame):
+        # print 'catched singal: %d' % signum
+        self.sock.close()
+        sys.exit()
+
+    def main(self):
+        self.sock.listen(5)
+        while not rospy.is_shutdown():
+            client, address = self.sock.accept()
+            # client.settimeout(60)
+            # Ros data send to computer thread
+            t1 = threading.Thread(target=self.send_function, args=(client,))
+            #t1 = multiprocessing.Process(target=self.send_function, args=(client,))
+            # recv data from computer thread
+            t2 = threading.Thread(target=self.recv_function, args=(client,))
+            #t2 = multiprocessing.Process(target=self.recv_function, args=(client,launch))
+
+            t1.setDaemon(True)
+            t1.start()
+            t2.setDaemon(True)
+            t2.start()
+            print('threading ok')
+            signal.signal(signal.SIGTERM, self.term_sig_handler)
+            signal.signal(signal.SIGINT, self.term_sig_handler)
+
+
+if __name__ == "__main__":
+    try:
+        HCU_to_computer().main()
+    except rospy.ROSInterruptException:
+        pass

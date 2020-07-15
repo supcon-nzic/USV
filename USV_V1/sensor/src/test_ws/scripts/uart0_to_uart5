@@ -1,0 +1,52 @@
+#!/usr/bin/python
+# -*-coding: utf-8 -*-
+
+import rospy
+
+import serial
+import binascii
+from datetime import datetime
+import struct
+import csv
+from time import sleep
+
+#ttyPS1=UART1
+#ttyPS0=UART0
+serialPort0 = '/dev/ttyPS0'  
+baudRate0 = 9600  
+is_exit=False
+data_bytes=bytearray()
+
+serialPort5 = '/dev/ttyS5'  
+baudRate5 = 9600  
+
+
+
+def uart0_to_uart5():
+    rospy.init_node('uart0_to_uart5', anonymous = True)
+    ser1 = serial.Serial(serialPort0, baudRate0)    #open uast0
+    ser2 = serial.Serial(serialPort5, baudRate5)    #open uast5
+    print('uart0 to uart5 ok')
+    while not rospy.is_shutdown():
+        count = ser1.read(66)
+        #print('count'+str(count))
+        #if count == '':
+        #    continue
+        #else:
+        #    break
+        #sleep(0.01)
+        #for i in count:
+        #    print('0x%x'%ord(i))
+          
+        ser2.write(count)
+        
+if __name__ == '__main__':
+    try:
+        uart0_to_uart5()
+    except rospy.ROSInterruptException:
+        pass
+
+
+           
+
+

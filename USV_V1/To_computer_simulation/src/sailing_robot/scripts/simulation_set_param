@@ -1,0 +1,38 @@
+#!/usr/bin/python
+# Simulator set param
+
+
+import rospy
+import time
+	
+def simulation_set_param():
+	rospy.init_node("simulation_set_param", anonymous = True)
+	
+	radius = rospy.get_param('/wp/target_radius')
+	position = rospy.get_param('/wp/table/1')
+	
+	
+	rospy.loginfo("get param radius [%d]", radius)
+	
+	rospy.set_param('/wp/target_radius',15)
+	rospy.set_param('/wp/table/1',[29.867690,121.538515])
+	rospy.loginfo("set param radius 15")
+	
+
+	radius = rospy.get_param('/wp/target_radius')
+	position = rospy.get_param('/wp/table/1')
+	
+	rospy.loginfo("get param radius [%d]", radius)
+
+	time.sleep(20)
+
+	tasks = rospy.get_param('/wp/tasks')
+	rospy.loginfo("get param tasks")
+	rospy.set_param('/wp/tasks',[{"kind":"keep_station","waypoint":"1","linger":60},{"kind":"keep_station","waypoint":"2","linger":60}])
+	rospy.loginfo("set param tasks")
+
+if __name__ == '__main__':
+	try:
+		simulation_set_param()
+	except rospy.ROSInterruptException:
+		pass

@@ -1,0 +1,9 @@
+\subsubsection usage Usage
+\verbatim
+<node name="tasks" pkg="sailing_robot" type="tasks">
+  <param name="radius" type="double" value="2.0" />
+  <param name="samples" type="double" value="50.0" />
+  <param name="threshold" type="double" value="0.8" />
+</node>
+\endverbatim
+

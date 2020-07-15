@@ -1,0 +1,140 @@
+#!/usr/bin/env python
+"""Node steps through a series of tasks to perform.
+
+Tasks (or waypoints) are loaded from parameters, and then each one is used to
+calculate sailing_state and goal_heading until its check_end_condition()
+returns True.
+"""
+
+import rospy
+from std_msgs.msg import Float32
+from std_msgs.msg import Float64
+from std_msgs.msg import String, Bool, Int16
+#from ball_detect.msg import BoatAndBall
+from dynamic_reconfigure.server import Server
+from sailing_robot.make_ros_tasks_runner import make_ros_tasks_runner
+from sailing_robot.navigation import Navigation
+from sailing_robot.cfg import TackVotingConfig
+from sensor_msgs.msg import NavSatFix
+import threading
+import operator
+import json
+
+nav = None
+
+
+# def goal_heading_publisher(tasks_runner):
+#     pub = rospy.Publisher("goal_heading", Float32, queue_size = 10)
+#     pub_state = rospy.Publisher("sailing_state", String, queue_size = 10)
+#     pub_direct = rospy.Publisher('direct', Bool, queue_size = 10)
+#     pub_detected = rospy.Publisher('detected', Bool, queue_size = 10)
+#     pub_task_direct_rudder_control = rospy.Publisher('task_direct_rudder_control', Int16, queue_size = 10)
+#     pub_task_direct_sailsheet_normalized = rospy.Publisher('task_direct_sailsheet_normalized', Int16, queue_size = 10)
+#     rate = rospy.Rate(rospy.get_param("config/rate"))
+
+#     tasks_runner.start_next_task()
+#     while not rospy.is_shutdown():
+#         state, goal_heading = tasks_runner.calculate_state_and_goal()
+#         pub.publish(goal_heading)
+#         pub_state.publish(state)
+#         pub_direct.publish(nav.direct)
+#         if nav.detected:
+#             pub_detected.publish(nav.detected)
+#         pub_task_direct_rudder_control.publish(nav.task_direct_rudder_control)
+#         pub_task_direct_sailsheet_normalized.publish(nav.task_direct_sailsheet_normalized)
+#         rate.sleep()
+
+
+def jibe_tack_now(msg):
+    tasks_runner.insert_task({
+        'kind': 'jibe_tack_now', 'action': msg.data,
+    })
+
+
+def insert_waypoint(msg):
+    tasks_runner.insert_task({
+        'kind': 'to_waypoint', 'waypoint_ll': (msg.latitude, msg.longitude), 'target_radius': 2.5,
+        # set default value, hot fix for the force jibing node
+        'tack_voting_radius': 1  # set default value, hot fix for the force jibing node
+    })
+
+
+def tack_voting_callback(config, level):
+    """
+    get updates for the dynamic parameters
+    """
+    radius = config.radius
+    samples = config.samples
+    threshold = config.threshold
+    return config
+
+
+#def yaml_param():
+#    tasks_runner = make_ros_tasks_runner(rospy.get_param("wp"), nav)
+
+
+if __name__ == '__main__':
+    try:
+        rospy.init_node("publish_goal_heading", anonymous = True)
+        # tasks = rospy.get_param("tasks")
+        nav_options = rospy.get_param("navigation")
+        nav = Navigation(**nav_options)
+        nav.rudder_param = rospy.get_param('rudder')
+
+        #t1 = threading.Thread(target = yaml_param, args(nav,))
+        data1 = rospy.get_param("wp")
+        data3 = data1
+        data1 = json.dumps(data1)
+        tasks_runner = make_ros_tasks_runner(data3, nav)
+
+        #rospy.logwarn('data1'+str(data1))
+
+        #rospy.logwarn("yuqizhi"+str(rospy.get_param("wp")))
+        
+        rospy.Subscriber('heading', Float32, nav.update_heading)
+        rospy.Subscriber('wind_direction_apparent', Float64, nav.update_wind_direction)
+        rospy.Subscriber('position', NavSatFix, nav.update_position)
+        #rospy.Subscriber('/yolo_detection/boat_and_ball', BoatAndBall, nav.update_boat_and_ball)
+        rospy.Subscriber('temporary_wp', NavSatFix, insert_waypoint)
+        rospy.Subscriber('jibe_tack_now', String, jibe_tack_now)
+        srv = Server(TackVotingConfig, tack_voting_callback)
+
+
+        #goal_heading_publisher(tasks_runner)
+        pub = rospy.Publisher("goal_heading", Float32, queue_size = 10)
+        pub_state = rospy.Publisher("sailing_state", String, queue_size = 10)
+        pub_direct = rospy.Publisher('direct', Bool, queue_size = 10)
+        pub_detected = rospy.Publisher('detected', Bool, queue_size = 10)
+        pub_task_direct_rudder_control = rospy.Publisher('task_direct_rudder_control', Int16, queue_size = 10)
+        pub_task_direct_sailsheet_normalized = rospy.Publisher('task_direct_sailsheet_normalized', Int16, queue_size = 10)
+        rate = rospy.Rate(rospy.get_param("config/rate"))
+
+        tasks_runner.start_next_task()
+
+        while not rospy.is_shutdown():
+
+            #rospy.logwarn("yuqizhi"+str(rospy.get_param("wp")))
+            data = rospy.get_param("wp")
+            data2 = data
+            data2 = json.dumps(data2)
+            #rospy.logwarn(data2)
+            #rospy.logwarn(data2 == data1)
+            if data2 != data1:
+                data1 = data2
+                tasks_runner = make_ros_tasks_runner(data, nav)
+                tasks_runner.start_next_task()
+                #rospy.logwarn('0000000000000000000000000000')
+
+
+            state, goal_heading = tasks_runner.calculate_state_and_goal()
+            pub.publish(goal_heading)
+            pub_state.publish(state)
+            pub_direct.publish(nav.direct)
+            if nav.detected:
+                pub_detected.publish(nav.detected)
+            pub_task_direct_rudder_control.publish(nav.task_direct_rudder_control)
+            pub_task_direct_sailsheet_normalized.publish(nav.task_direct_sailsheet_normalized)
+            rate.sleep()
+
+    except rospy.ROSInterruptException:
+        pass

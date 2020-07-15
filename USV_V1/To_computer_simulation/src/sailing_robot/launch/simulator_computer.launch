@@ -1,0 +1,51 @@
+<launch>
+    <!--
+    General test file to launch simulator
+    -->
+
+    <!--
+    Parameters
+    -->
+
+    <!--include file = "$(find apriltag_ros)/launch/single_apriltag_detect.launch" /-->
+
+    <rosparam file="$(find sailing_robot)/launch/parameters/default.yaml" command="load"/>
+
+    <rosparam file="$(find sailing_robot)/launch/parameters/calibration_blackpython.yaml" ns="/calibration"
+              command="load"/>
+    <rosparam file="$(find sailing_robot)/launch/parameters/rudder_settings.yaml" command="load"/>
+    <rosparam file="$(find sailing_robot)/launch/parameters/sail_settings.yaml" command="load"/>
+
+    <!--rosparam file="$(find sailing_robot)/launch/parameters/hide_and_seek.yaml" command="load"/-->
+
+    <rosparam file="$(find sailing_robot)/launch/parameters/to_waypoint.yaml" command="load"/>
+
+    <rosparam file="$(find sailing_robot)/launch/parameters/simulator.yaml" command="load"/>
+
+    <param name="log_name" value="simulator_test"/>
+
+    <!--
+    Nodes
+    -->
+    <node name="tasks" pkg="sailing_robot" type="tasks" output="screen"/>
+    <!-- uncomment if helming is not used
+    <node name = "tack" pkg="sailing_robot" type = "tack" />
+    <node name = "actuator_demand_rudder" pkg="sailing_robot" type = "actuator_demand_rudder" />
+    <node name = "actuator_demand_sail" pkg="sailing_robot" type = "actuator_demand_sail" />
+    -->
+    <node name="helming" pkg="sailing_robot" type="helming"/>
+    <node name="simulation_position" pkg='sailing_robot' type="simulation_position"/>
+    <node name="simulation_velocity" pkg='sailing_robot' type="simulation_velocity"/>
+    <node name="simulation_wind_apparent" pkg="sailing_robot" type="simulation_wind_apparent"/>
+    <node name="simulation_heading" pkg="sailing_robot" type="simulation_heading"/>
+    <node name="simulation_DI_AI" pkg="sailing_robot" type="simulation_DI_AI"/>
+    <node name="hcu_to_computer" pkg="sailing_robot" type="hcu_to_computer"/> 
+    <!--node name = "sensor_camera_detect" pkg="sailing_robot" type="sensor_camera_detect" /-->
+    <node name="debugging_2D_plot_matplot" pkg='sailing_robot' type="debugging_2D_plot_matplot" output = "screen"/>
+    <node name="sensor_processed_wind_direction" pkg="sailing_robot" type="sensor_processed_wind_direction"/>
+    <!--node name="simulation_gps_fix" pkg="sailing_robot" type="simulation_gps_fix"/-->
+    <!--node name="debugging_gps_log" pkg='sailing_robot' type="debugging_gps_log"/-->
+    <!--node name ="rosbag_record" pkg = "rosbag" type = "record" respawn = "true" args = "/position /usb_cam/image_raw /tag_detections /tag_detections_image  -o /home/zuzu/sailing_robot" /-->
+     
+    <node name="debugging_dashboard" pkg="sailing_robot" type="debugging_dashboard"/>
+</launch>

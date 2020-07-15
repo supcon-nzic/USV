@@ -1,0 +1,45 @@
+#!/usr/bin/env python
+# -*-coding: utf-8 -*-
+#license removed for brevity
+
+import rospy
+from std_msgs.msg import Float64
+from sensor_dep.adc_func import adc_read
+import numpy
+import numpy as np
+
+def ser_adc():
+	rospy.init_node('ser_adc', anonymous = True)
+	pub = rospy.Publisher('wind_direction_apparent', Float64, queue_size = 10)
+	rate = rospy.Rate(10)
+
+	while not rospy.is_shutdown():
+              wind_direction_apparent = Float64()
+              wind_direction_apparent_list = []
+              for i in range(10):
+                  wind_direction_apparent.data=int(float(adc_read(1))/3490*360)     #accept adc data and convert wind data
+                  if wind_direction_apparent.data > 360:
+                      wind_direction_apparent.data = 360
+                  wind_direction_apparent_list.append(wind_direction_apparent.data)
+                  #print(wind_direction_apparent_list[i])
+
+              size1 = len(wind_direction_apparent_list)
+              #print('size1'+str(size1))
+              wind_direction_apparent_list.sort()
+
+              wind_direction_appparent_pop = wind_direction_apparent_list.pop(0)
+              wind_direction_appparent_pop = wind_direction_apparent_list.pop(8)
+              #print('wind_direction_apparent_list'+str(wind_direction_apparent_list))
+              size2 = len(wind_direction_apparent_list)
+              #print('size2'+str(size2))
+              wind_direction_apparent.data = np.mean(wind_direction_apparent_list)
+              wind_direction_apparent.data = int(wind_direction_apparent.data)
+              pub.publish(wind_direction_apparent)
+              print('wind:'+str(wind_direction_apparent.data))
+              rate.sleep()
+
+if __name__ == '__main__':
+	try:
+	    ser_adc()
+	except rospy.ROSInterruptException:
+	    pass

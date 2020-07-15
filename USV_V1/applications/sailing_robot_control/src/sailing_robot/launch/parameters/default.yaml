@@ -1,0 +1,159 @@
+#
+# DUMMY
+#
+# These are dummy values whilst development goes on. We should get rid of them :D
+# (Or keep them for some tests only)
+
+# apparent wind direction, for tests with a human simulated constant wind direction
+# in degrees, conventions like for wind_direction_apparent topic
+dummy/wind_direction_apparent: 0
+
+# dummy heading, for tests without the compass working
+# in degrees
+dummy/heading: 25
+
+# dummy latitude/longitude paramters for tests indoors, without position fix
+# in degrees
+dummy/latitude: 50.936981
+dummy/longitude: -1.405315
+
+# P2: 50.93716  &  -1.405683
+# P3: 50.936908 &  -1.406061
+
+#
+# Configuration
+#
+# General configuration settings
+
+# ROS rate
+# in [Hz]
+config/rate: 10
+
+
+# Battery sensor rate
+# in [Hz]
+config/battery_rate: 0.05
+
+#
+# Navigation
+#
+# Values relevant for higherlevel waypoint navigation
+
+# Angle area from going directly upwind to the end of the deadzone (the total
+# angular area of the dead zone is therefore 2*beating_angle).
+# in [degrees]
+navigation/beating_angle: 45
+# Zone number of the UTM system to use. Southampton is in zone 30,
+# Oslo in zone 32. http://www.dmap.co.uk/utmworld.htm
+# Distance calculations will be less accurate the further from the specified
+# zone you are.
+navigation/utm_zone: 51
+# define absolute_wind_direction
+nav/absolute_wind_direction: 200
+
+#
+# Helming Procedure
+#
+# True to turn by jibing preferably instead of tacking:
+procedure/jibe_to_turn: false
+
+# Timeout after wich a procedure is considered as failed
+procedure/timeout: 15 #in second
+
+# Exploration coefficient: it is the percentage of exploration in the search for the best procedure
+# If the coefficient is 0: the fastest procedure that works will always be chosen
+# If the coefficient is 1: all the procedures will be tried randomly at first
+# If the coefficient is 0.3: 30% of the time an untested procedure will be tried
+procedure/exploration_coefficient: 0 #number between 0 and 1
+
+
+#
+# Wave Position
+#
+wave_position/time_range: 2.5 # time window in seconds captured by the wave_position algorithm
+wave_position/refresh_time: 0.5 # how often the model is re-trained
+
+
+
+# Heading
+# Define which heading the boat uses (compensate for the z axis or not
+heading/compensation: true
+
+heading/offset_true_north: -0.75   # in degree, for SOUTHAMPTON 2018
+#heading/offset_true_north: -1.017 # in degree, for SOUTHAMPTON 2016
+#heading/offset_true_north: -2.6   # in degree, for PORTUGAL 2016
+
+#
+# Rudder Parameters
+#
+
+# PID values for rudder control
+rudder/control/Kp: 0.5
+rudder/control/Ki: 0
+rudder/control/Kd: 0.1
+
+
+# maximum angle
+# absolute value, in [degrees], see https://github.com/Maritime-Robotics-Student-Society/sailing-robot/wiki/Naming-conventions
+rudder/maxAngle: 40
+
+# initial position
+# in [degrees]
+rudder/initialAngle: 0
+
+
+#
+# Wind Direction Parameters
+#
+# To avoid noise of the wind sensor, we average it over a time
+# in [seconds]
+wind/sensor_average_time: 0.5
+
+# The route planning should consider the longer term trend of the wind direction
+# so a longer average is calculated
+# in [seconds]
+wind/trend_average_time: 40.0
+
+
+
+
+# Camera detection
+#
+# Threshold at wich the detection will be triggered (=% of the image that contain the colors)
+# (here 4%)
+camera_detection/threshold: 0.04
+
+# Rate at wich picture are taken
+camera_detection/rate: 5  # [Hz]
+
+# If more than 50% of the photos within this average time are above threshold, a detection is published
+camera_detection/average_time: 1  # [s]
+
+
+# Two colors are needed because red is in the upper and lower end of the HSV colour space
+# Lower color:
+camera_detection/Lower_color_hsv1: [0, 173, 143] # /!\ HSV colorspace
+# Upper color:
+camera_detection/Upper_color_hsv1: [12,255,255] # /!\ HSV colorspace
+
+# Lower color:
+camera_detection/Lower_color_hsv2: [0, 0, 0] # /!\ HSV colorspace
+# Upper color:
+camera_detection/Upper_color_hsv2: [0,0,0] # /!\ HSV colorspace
+
+
+# Power-On Self Test. If run, the rudder will wiggle and the sheet move
+# when ROS is started, to check everything is working.
+do_post: true
+
+# Change GPS rate to 5Hz - if we run into problems, turn this off to use the
+# default. Takes several seconds due to waits - this can probably be reduced if
+# needed.
+change_gps_rate: true
+
+# Use i2c for the GPS connection (otherwise serial is used)
+gps_via_i2c: true
+
+# switch model true measing only normal
+model: False
+#False
